@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title> IGCSE Physics Interactive Exam</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Cairo', sans-serif; }
+        body.en-mode { font-family: 'Inter', sans-serif; }
+        .correct { background-color: #dcfce7 !important; border-color: #16a34a !important; }
+        .incorrect { background-color: #fee2e2 !important; border-color: #dc2626 !important; }
+        .timer-warning { color: #dc2626 !important; animation: pulse 1s infinite; }
+        @keyframes pulse { 50% { opacity: 0.7; } }
+        @media print { .no-print { display: none !important; } }
+        .success-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-weight: bold; font-size: 0.875rem; }
+        .grade-excellent { background: #dcfce7; color: #166534; }
+        .grade-good { background: #fef3c7; color: #92400e; }
+        .grade-pass { background: #dbeafe; color: #1e40af; }
+        .grade-fail { background: #fee2e2; color: #991b1b; }
+        .lang-switch {
+            position: fixed; top: 16px; left: 16px; z-index: 100;
+            background: white; padding: 6px; border-radius: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15); display: flex; gap: 4px;
+            border: 2px solid #dc2626;
+        }
+        [dir="ltr"] .lang-switch { left: auto; right: 16px; }
+        .lang-btn {
+            padding: 6px 14px; border-radius: 20px; cursor: pointer; font-weight: bold;
+            transition: all 0.3s; border: none; font-size: 0.875rem;
+            background: transparent; color: #6b7280;
+        }
+        .lang-btn.active { background: #dc2626; color: white; box-shadow: 0 2px 6px rgba(220,38,38,0.4); }
+        .lang-btn:hover:not(.active) { background: #fef2f2; color: #dc2626; }
+        .shuffle-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #dc2626, #b91c1c);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+        .math-display {
+            display: inline-block;
+            direction: ltr;
+            font-family: 'Times New Roman', 'Cambria Math', serif;
+            font-size: 1.2em;
+            font-style: italic;
+            padding: 2px 8px;
+            background: #fef2f2;
+            border-radius: 6px;
+            margin: 2px;
+            color: #b91c1c;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        .save-indicator {
+            position: fixed; bottom: 20px; left: 20px; z-index: 200;
+            background: #10b981; color: white; padding: 8px 16px;
+            border-radius: 20px; font-size: 0.8rem; font-weight: bold;
+            opacity: 0; transition: opacity 0.3s; pointer-events: none;
+            box-shadow: 0 4px 12px rgba(16,185,129,0.4);
+        }
+        .save-indicator.show { opacity: 1; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-red-50 to-orange-50 text-gray-800 p-4 md:p-8 min-h-screen">
+
+    <div class="lang-switch no-print">
+        <button class="lang-btn active" onclick="setLanguage('ar')" id="btn-ar">عربي</button>
+        <button class="lang-btn" onclick="setLanguage('en')" id="btn-en">EN</button>
+    </div>
+
+    <div id="saveIndicator" class="save-indicator">💾 <span data-ar="تم الحفظ" data-en="Saved">تم الحفظ</span></div>
+
+    <div id="timer-container" class="max-w-4xl mx-auto mb-4 text-center no-print">
+        <div class="bg-white p-4 rounded-2xl shadow-md inline-block border-2 border-red-100">
+            <span class="text-gray-600 ml-2" data-ar="⏰ الوقت المتبقي:" data-en="⏰ Time Remaining:"> الوقت المتبقي:</span>
+            <span id="timer" class="text-2xl font-bold text-red-600 font-mono">60:00</span>
+            <span class="shuffle-badge" data-ar="🎲 أسئلة عشوائية" data-en="🎲 Random Questions">🎲 أسئلة عشوائية</span>
+        </div>
+    </div>
+
+    <div class="max-w-4xl mx-auto mb-6 flex flex-wrap gap-3 justify-center no-print">
+        <button onclick="toggleAnswers()" class="bg-red-600 hover:bg-red-700 text-white px-5 py-2 rounded-xl font-medium transition shadow cursor-pointer" data-ar="👀 إظهار / إخفاء الإجابات" data-en=" Show / Hide Answers">👀 إظهار / إخفاء الإجابات</button>
+        <button onclick="window.print()" class="bg-gray-700 hover:bg-gray-900 text-white px-5 py-2 rounded-xl font-medium transition shadow cursor-pointer" data-ar="🖨️ طباعة" data-en="🖨️ Print">🖨️ طباعة</button>
+        <button onclick="reshuffleExam()" class="bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white px-5 py-2 rounded-xl font-medium transition shadow cursor-pointer" data-ar="🔄 أسئلة جديدة" data-en="🔄 New Questions">🔄 أسئلة جديدة</button>
+        <button onclick="clearProgress()" class="bg-red-500 hover:bg-red-600 text-white px-5 py-2 rounded-xl font-medium transition shadow cursor-pointer" data-ar="🗑️ مسح التقدم" data-en="🗑️ Clear Progress">🗑️ مسح التقدم</button>
+    </div>
+
+    <header class="max-w-4xl mx-auto bg-white p-6 rounded-2xl shadow-lg mb-8 border-4 border-red-400">
+        <div class="text-center">
+            <h1 class="text-2xl md:text-3xl font-bold text-gray-900 mb-2" data-ar="🔬 IGCSE Physics Interactive Exam" data-en="🔬 IGCSE Physics Interactive Exam">🔬 IGCSE Physics Interactive Exam</h1>
+            <h2 class="text-lg text-red-600 font-semibold" data-ar="Pearson Edexcel International GCSE (9-1)" data-en="Pearson Edexcel International GCSE (9-1)">Pearson Edexcel International GCSE (9-1)</h2>
+            <p class="text-sm text-gray-600 mt-2" data-ar="أسئلة من: Hair Dryer & Fuse, Decorative Lamp, Velocity-Time Graph" data-en="Questions from: Hair Dryer & Fuse, Decorative Lamp, Velocity-Time Graph">أسئلة من: Hair Dryer & Fuse, Decorative Lamp, Velocity-Time Graph</p>
+            <p class="text-xs text-green-600 mt-2 font-semibold" data-ar="💾 يتم حفظ تقدمك تلقائياً" data-en=" Your progress is saved automatically">💾 يتم حفظ تقدمك تلقائياً</p>
+        </div>
+        <div class="mt-4 flex flex-wrap justify-center gap-4 text-sm text-gray-600">
+            <span><span data-ar="📅 التاريخ:" data-en="📅 Date:">📅 التاريخ:</span> <input type="text" id="examDate" class="border-b-2 border-red-300 bg-transparent w-28 text-center"></span>
+            <span><span data-ar="😊 الاسم:" data-en="😊 Name:">😊 الاسم:</span> <input type="text" id="studentName" class="border-b-2 border-red-300 bg-transparent w-32 text-center" placeholder="اكتب اسمك"></span>
+            <span><span data-ar="🏫 الشعبة:" data-en="🏫 Class:">🏫 الشعبة:</span> <input type="text" id="studentClass" class="border-b-2 border-red-300 bg-transparent w-28 text-center" placeholder="الشعبة"></span>
+            <span><span data-ar="⏰ المدة: 60 دقيقة" data-en=" Duration: 60 min">⏰ المدة: 60 دقيقة</span></span>
+            <span><span data-ar="📊 المجموع: 100 درجة" data-en=" Total: 100 pts"> المجموع: 100 درجة</span></span>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto space-y-8" id="exam-content"></main>
+
+    <div class="text-center no-print pb-8 mt-8">
+        <button onclick="gradeExam()" class="bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white text-lg px-10 py-4 rounded-2xl font-bold shadow-xl transition transform hover:scale-105 cursor-pointer" data-ar="🎯 صحح إجاباتي!" data-en="🎯 Grade My Answers!">🎯 صحح إجاباتي!</button>
+    </div>
+
+    <div id="results-panel" class="max-w-4xl mx-auto mt-8 bg-white p-8 rounded-2xl shadow-2xl border-4 border-red-400 hidden no-print">
+        <h2 class="text-3xl font-bold text-gray-900 mb-6 text-center" data-ar="🏆 نتيجتك يا بطل! 🏆" data-en="🏆 Your Results, Champion! 🏆">🏆 نتيجتك يا بطل! 🏆</h2>
+        <div class="grid md:grid-cols-3 gap-4 mb-6">
+            <div class="bg-red-50 p-4 rounded-xl text-center"><p data-ar="😊 الاسم" data-en="😊 Name">😊 الاسم</p><p id="res-name" class="font-bold text-xl text-red-700">-</p></div>
+            <div class="bg-orange-50 p-4 rounded-xl text-center"><p data-ar="📅 التاريخ" data-en="📅 Date"> التاريخ</p><p id="res-date" class="font-bold text-xl text-orange-700">-</p></div>
+            <div class="bg-red-50 p-4 rounded-xl text-center"><p data-ar="🌟 المجموع" data-en="🌟 Score">🌟 المجموع</p><p id="res-total" class="font-bold text-3xl text-red-600">0 / 100</p></div>
+        </div>
+        <div class="text-center mb-6">
+            <span id="success-badge" class="success-badge grade-excellent">-</span>
+            <p id="success-percent" class="text-4xl font-bold text-red-600 mt-2">0%</p>
+            <p class="text-sm text-gray-500" data-ar="نسبة النجاح" data-en="Success Rate">نسبة النجاح</p>
+        </div>
+        <div class="bg-gray-50 p-6 rounded-xl mb-6">
+            <h3 class="font-bold text-lg mb-4 text-gray-800" data-ar="📊 أدائك في كل قسم:" data-en="📊 Your Performance:">📊 أدائك في كل قسم:</h3>
+            <div class="space-y-3" id="sections-performance"></div>
+        </div>
+        <div class="text-center mb-6">
+            <button id="sendEmailBtn" onclick="sendResultsToEmail()" class="bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-700 hover:to-orange-700 text-white text-lg px-8 py-3 rounded-2xl font-bold shadow-xl transition transform hover:scale-105 cursor-pointer" data-ar="📧 أرسل النتيجة للمعلم" data-en="📧 Send Results to Teacher">📧 أرسل النتيجة للمعلم</button>
+            <p id="emailStatus" class="text-sm mt-2 text-center font-medium"></p>
+        </div>
+        <div class="flex gap-3 justify-center">
+            <button onclick="window.print()" class="bg-gray-700 text-white px-6 py-3 rounded-xl font-semibold" data-ar="🖨️ طباعة النتيجة" data-en="🖨️ Print Results">🖨️ طباعة النتيجة</button>
+        </div>
+    </div>
+
+    <footer class="max-w-4xl mx-auto mt-10 mb-8 text-center text-gray-500 text-sm no-print">
+        © <span data-ar="IGCSE Physics Interactive Exam" data-en="IGCSE Physics Interactive Exam">IGCSE Physics Interactive Exam</span> | Mr. Mohammed Hesham 🔬
+    </footer>
+
+<script>
+// ==================== EmailJS Settings ====================
+const PUBLIC_KEY = "Rb3Lq8tXaFmc5YHUH";
+const SERVICE_ID = "service_w15m64i";
+const TEMPLATE_ID = "template_5b0u2tq";
+const TARGET_EMAIL = "mohammedhesham872@gmail.com";
+
+emailjs.init(PUBLIC_KEY);
+
+// ==================== 💾 Save Progress System ====================
+const STORAGE_KEY = 'igcse_physics_interactive_exam_v1';
+const TOTAL_TIME = 3600; // 60 minutes
+
+let currentSeed = null;
+let answersVisible = false;
+let saveIndicatorTimeout = null;
+let actualQuestionsCount = 0;
+
+function mulberry32(a) {
+    return function() {
+        var t = a += 0x6D2B79F5;
+        t = Math.imul(t ^ t >>> 15, t | 1);
+        t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    }
+}
+
+let rng = null;
+
+function showSaveIndicator() {
+    const indicator = document.getElementById('saveIndicator');
+    indicator.classList.add('show');
+    if (saveIndicatorTimeout) clearTimeout(saveIndicatorTimeout);
+    saveIndicatorTimeout = setTimeout(() => indicator.classList.remove('show'), 1500);
+}
+
+function saveState(showIndicator = true) {
+    try {
+        const state = {
+            seed: currentSeed,
+            lang: currentLang,
+            studentName: document.getElementById('studentName').value,
+            studentClass: document.getElementById('studentClass').value,
+            examDate: document.getElementById('examDate').value,
+            answers: getSelectedAnswers(),
+            timeRemaining: timeRemaining,
+            answersVisible: answersVisible,
+            savedAt: Date.now()
+        };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        if (showIndicator) showSaveIndicator();
+    } catch (e) { console.error('Save error:', e); }
+}
+
+function loadState() {
+    try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) return JSON.parse(saved);
+    } catch (e) { console.error('Load error:', e); }
+    return null;
+}
+
+function getSelectedAnswers() {
+    const answers = {};
+    for (let i = 0; i < actualQuestionsCount; i++) {
+        const selected = document.querySelector(`input[name="q${i}"]:checked`);
+        if (selected) answers[i] = selected.value;
+    }
+    return answers;
+}
+
+function restoreAnswers(answers) {
+    if (!answers) return;
+    for (const [idx, val] of Object.entries(answers)) {
+        const radio = document.querySelector(`input[name="q${idx}"][value="${val}"]`);
+        if (radio) radio.checked = true;
+    }
+}
+
+function clearProgress() {
+    const confirmMsg = currentLang === 'ar' 
+        ? '⚠️ هل أنت متأكد من مسح كل التقدم؟' 
+        : '⚠️ Are you sure you want to clear all progress?';
+    if (confirm(confirmMsg)) {
+        localStorage.removeItem(STORAGE_KEY);
+        location.reload();
+    }
+}
+
+function setupAnswerListeners() {
+    document.getElementById('exam-content').addEventListener('change', (e) => {
+        if (e.target.type === 'radio') saveState();
+    });
+}
+
+function setupInputListeners() {
+    ['studentName', 'studentClass', 'examDate'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('input', () => saveState(false));
+            el.addEventListener('blur', () => saveState());
+        }
+    });
+}
+
+// ==================== Exam Data (Based on provided solutions) ====================
+const originalExamData = {
+    sections: [
+        {
+            id: 'sec1',
+            title: { ar: '🔹 الجزء 1: Hair Dryer & Fuse (مجفف الشعر والفيوز)', en: '🔹 Part 1: Hair Dryer & Fuse' },
+            questions: [
+                {
+                    q: { ar: 'أي سلك في مجفف الشعر يجب أن يكون متصلاً على التوالي مع الفيوز؟', en: 'Which wire in the hair dryer should be in series with the fuse?' },
+                    options: [
+                        { ar: 'السلك الحي (Live wire)', en: 'Live wire' },
+                        { ar: 'السلك المحايد (Neutral wire)', en: 'Neutral wire' },
+                        { ar: 'سلك الأرضي (Earth wire)', en: 'Earth wire' },
+                        { ar: 'أي سلك من الثلاثة', en: 'Any of the three wires' }
+                    ],
+                    correct: 0,
+                    answer: { ar: 'الفيوز يجب أن يكون متصلاً على التوالي مع السلك الحي (Live wire) لضمان قطع الدائرة عند حدوث عطل', en: 'The fuse must be connected in series with the live wire to break the circuit in case of a fault' }
+                },
+                {
+                    q: { ar: 'ما هو دور الفيوز كميزة أمان كهربائي؟', en: 'What is the role of a fuse as an electrical safety feature?' },
+                    options: [
+                        { ar: 'يذوب ويقطع الدائرة عند مرور تيار زائد', en: 'Melts and breaks the circuit when excessive current flows' },
+                        { ar: 'يخفض الجهد الكهربائي', en: 'Reduces the electrical voltage' },
+                        { ar: 'يزيد من مقاومة الدائرة', en: 'Increases the circuit resistance' },
+                        { ar: 'يخزن الطاقة الكهربائية', en: 'Stores electrical energy' }
+                    ],
+                    correct: 0,
+                    answer: { ar: 'الفيوز يذوب ويقطع الدائرة عند مرور تيار زائد، مما يجعل الجهاز آمناً', en: 'The fuse melts and breaks the circuit when excessive current flows, making the appliance safe' }
+                },
+                {
+                    q: { ar: 'أي من التالي يُعد ميزة أمان كهربائي أخرى تُستخدم في الأجهزة المنزلية؟', en: 'Which of the following is another electrical safety feature used in domestic appliances?' },
+                    options: [
+                        { ar: 'سلك الأرضي (Earth wire)', en: 'Earth wire' },
+                        { ar: 'المفتاح العادي', en: 'Regular switch' },
+                        { ar: 'المصباح الكهربائي', en: 'Light bulb' },
+                        { ar: 'المقاومة المتغيرة', en: 'Variable resistor' }
+                    ],
+                    correct: 0,
+                    answer: { ar: 'سلك الأرضي يوفر مساراً منخفض المقاومة إلى الأرض في حالة لمس السلك الحي للهيكل المعدني', en: 'Earth wire provides a low-resistance path to ground if the live wire touches the metal casing' }
+                },
+                {
+                    q: { ar: 'ما هو قاطع الدائرة (Circuit Breaker)؟', en: 'What is a Circuit Breaker?' },
+                    options: [
+                        { ar: 'جهاز يفصل الدائرة تلقائياً إذا تجاوز التيار القيمة الآمنة', en: 'A device that automatically switches off the circuit if current exceeds a safe value' },
+                        { ar: 'جهاز يقيس الجهد الكهربائي', en: 'A device that measures electrical voltage' },
+                        { ar: 'جهاز يخزن الكهرباء', en: 'A device that stores electricity' },
+                        { ar: 'جهاز يزيد من سرعة التيار', en: 'A device that increases current speed' }
+                    ],
+                    correct: 0,
+                    answer: { ar: 'قاطع الدائرة يفصل الدائرة تلقائياً إذا تجاوز التيار القيمة الآمنة', en: 'A circuit breaker automatically switches off the circuit if current exceeds a safe value' }
+                }
+            ]
+        },
+        {
+            id: 'sec2',
+            title: { ar: '🔹 الجزء 2: Decorative Lamp (المصباح الزخرفي)', en: '🔹 Part 2: Decorative Lamp' },
+            questions: [
+                {
+                    q: { ar: 'ما هي عيب توصيل المصابيح على التوالي (in series)؟', en: 'What is a disadvantage of connecting bulbs in series?' },
+                    options: [
+                        { ar: 'إذا انكسر مصباح واحد، تنطفئ جميع المصابيح', en: 'If one bulb breaks, all other bulbs go out' },
+                        { ar: 'المصابيح أكثر سطوعاً', en: 'The bulbs are brighter' },
+                        { ar: 'يمكن إطفاء كل مصباح بشكل مستقل', en: 'Each bulb can be switched off independently' },
+                        { ar: 'يستخدم تياراً أكثر من التوصيل على التوازي', en: 'Uses more current than parallel connection' }
+                    ],
+                    correct: 0,
+                    answer: { ar: 'عيب التوصيل على التوالي: إذا انكسر مصباح واحد، تنكسر الدائرة وتنطفئ جميع المصابيح', en: 'Disadvantage of series: if one bulb breaks, the circuit is broken and all bulbs go out' }
+                },
+                {
+                    q: { ar: 'ما هي ميزة توصيل المصابيح على التوالي؟', en: 'What is an advantage of connecting bulbs in series?' },
+                    options: [
+                        { ar: 'يستخدم تياراً أقل من مصدر الكهرباء', en: 'Uses less current from the mains supply' },
+                        { ar: 'المصابيح أكثر سطوعاً', en: 'The bulbs are brighter' },
+                        { ar: 'يمكن التحكم في كل مصباح بشكل منفصل', en: 'Each bulb can be controlled independently' },
+                        { ar: 'إذا انكسر مصباح، تبقى الباقي مضيئة', en: 'If one bulb breaks, others stay lit' }
+                    ],
+                    correct: 0,
+                    answer: { ar: 'ميزة التوصيل على التوالي: يستخدم تياراً أقل من مصدر الكهرباء', en: 'Advantage of series: uses less current from the mains supply' }
+                },
+                {
+                    q: { ar: 'ما هي الصيغة التي تربط الجهد (V)، التيار (I)، والمقاومة (R)؟', en: 'What formula links voltage (V), current (I), and resistance (R)?' },
+                    options: [
+                        { ar: '<span class="math-display">V = I × R</span>', en: '<span class="math-display">V = I × R</span>' },
+                        { ar: '<span class="math-display">V = I / R</span>', en: '<span class="math-display">V = I / R</span>' },
+                        { ar: '<span class="math-display">V = I + R</span>', en: '<span class="math-display">V = I + R</span>' },
+                        { ar: '<span class="math-display">V = I - R</span>', en: '<span class="math-display">V = I - R</span>' }
+                    ],
+                    correct: 0,
+                    answer: { ar: 'قانون أوم: V = I × R (الجهد = التيار × المقاومة)', en: 'Ohm\'s Law: V = I × R (Voltage = Current × Resistance)' }
+                },
+                {
+                    q: { ar: 'مصباح مقاومته <span class="math-display">390 Ω</span> والجهد عبره <span class="math-display">33 V</span>. ما التيار في كل مصباح؟', en: 'A bulb has resistance <span class="math-display">390 Ω</span> and voltage across it is <span class="math-display">33 V</span>. What is the current in each bulb?' },
+                    options: [
+                        { ar: '<span class="math-display">0.085 A</span>', en: '<span class="math-display">0.085 A</span>' },
+                        { ar: '<span class="math-display">0.118 A</span>', en: '<span class="math-display">0.118 A</span>' },
+                        { ar: '<span class="math-display">11.8 A</span>', en: '<span class="math-display">11.8 A</span>' },
+                        { ar: '<span class="math-display">8.5 A</span>', en: '<span class="math-display">8.5 A</span>' }
+                    ],
+                    correct: 0,
+                    answer: { ar: 'I = V/R = 33/390 = 0.0846 A ≈ 0.085 A', en: 'I = V/R = 33/390 = 0.0846 A ≈ 0.085 A' }
+                }
+            ]
+        },
+        {
+            id: 'sec3',
+            title: { ar: '🔹 الجزء 3: Velocity-Time Graph (رسم السرعة-الزمن)', en: '🔹 Part 3: Velocity-Time Graph' },
+            questions: [
+                {
+                    q: { ar: 'كيف يُظهر الرسم البياني للسرعة-الزمن أن الشاحنة لها تسارع ثابت؟', en: 'How does the velocity-time graph show that the lorry has a constant acceleration?' },
+                    options: [
+                        { ar: 'الرسم عبارة عن خط مستقيم بميل ثابت', en: 'The graph is a straight line with a constant gradient' },
+                        { ar: 'الرسم عبارة عن منحنى', en: 'The graph is a curve' },
+                        { ar: 'الرسم عبارة عن خط أفقي', en: 'The graph is a horizontal line' },
+                        { ar: 'الرسم عبارة عن خط عمودي', en: 'The graph is a vertical line' }
+                    ],
+                    correct: 0,
+                    answer: { ar: 'التسارع = ميل رسم السرعة-الزمن، والميل الثابت يعني تسارعاً ثابتاً', en: 'Acceleration = gradient of velocity-time graph, constant gradient means constant acceleration' }
+                },
+                {
+                    q: { ar: 'ما هي الصيغة التي تربط التسارع (a)، التغير في السرعة (Δv)، والزمن (t)؟', en: 'What formula links acceleration (a), change in velocity (Δv), and time (t)?' },
+                    options: [
+                        { ar: '<span class="math-display">a = (v - u)/t</span>', en: '<span class="math-display">a = (v - u)/t</span>' },
+                        { ar: '<span class="math-display">a = (v + u)/t</span>', en: '<span class="math-display">a = (v + u)/t</span>' },
+                        { ar: '<span class="math-display">a = v × t</span>', en: '<span class="math-display">a = v × t</span>' },
+                        { ar: '<span class="math-display">a = v/t²</span>', en: '<span class="math-display">a = v/t²</span>' }
+                    ],
+                    correct: 0,
+                    answer: { ar: 'a = (v - u)/t حيث v = السرعة النهائية، u = السرعة الابتدائية، t = الزمن', en: 'a = (v - u)/t where v = final velocity, u = initial velocity, t = time' }
+                },
+                {
+                    q: { ar: 'من الرسم البياني: عند t = 0s كانت السرعة الابتدائية <span class="math-display">5 m/s</span>، وعند t = 60s كانت السرعة النهائية <span class="math-display">24 m/s</span>. ما التسارع؟', en: 'From the graph: at t = 0s initial velocity = <span class="math-display">5 m/s</span>, at t = 60s final velocity = <span class="math-display">24 m/s</span>. What is the acceleration?' },
+                    options: [
+                        { ar: '<span class="math-display">0.32 m/s²</span>', en: '<span class="math-display">0.32 m/s²</span>' },
+                        { ar: '<span class="math-display">0.40 m/s²</span>', en: '<span class="math-display">0.40 m/s²</span>' },
+                        { ar: '<span class="math-display">0.25 m/s²</span>', en: '<span class="math-display">0.25 m/s²</span>' },
+                        { ar: '<span class="math-display">0.50 m/s²</span>', en: '<span class="math-display">0.50 m/s²</span>' }
+                    ],
+                    correct: 0,
+                    answer: { ar: 'a = (24 - 5)/60 = 19/60 = 0.317 m/s² ≈ 0.32 m/s²', en: 'a = (24 - 5)/60 = 19/60 = 0.317 m/s² ≈ 0.32 m/s²' }
+                },
+                {
+                    q: { ar: 'ما هي وحدة قياس التسارع في النظام الدولي؟', en: 'What is the SI unit of acceleration?' },
+                    options: [
+                        { ar: '<span class="math-display">m/s²</span>', en: '<span class="math-display">m/s²</span>' },
+                        { ar: '<span class="math-display">m/s</span>', en: '<span class="math-display">m/s</span>' },
+                        { ar: '<span class="math-display">km/h</span>', en: '<span class="math-display">km/h</span>' },
+                        { ar: '<span class="math-display">m²/s</span>', en: '<span class="math-display">m²/s</span>' }
+                    ],
+                    correct: 0,
+                    answer: { ar: 'وحدة التسارع هي متر لكل ثانية مربعة (m/s²)', en: 'The unit of acceleration is meters per second squared (m/s²)' }
+                }
+            ]
+        },
+        {
+            id: 'sec4',
+            title: { ar: '🔹 الجزء 4: Electrical Safety (الأمان الكهربائي)', en: '🔹 Part 4: Electrical Safety' },
+            questions: [
+                {
+                    q: { ar: 'ما هو العزل المزدوج (Double Insulation)؟', en: 'What is Double Insulation?' },
+                    options: [
+                        { ar: 'طبقتان من العزل تلغيان الحاجة إلى سلك الأرضي', en: 'Two layers of insulation eliminate the need for an earth wire' },
+                        { ar: 'استخدام سلكين حيّين في الدائرة', en: 'Using two live wires in the circuit' },
+                        { ar: 'عزل الجهاز عن مصدر الكهرباء تماماً', en: 'Completely isolating the device from electricity' },
+                        { ar: 'استخدام فيوزين بدلاً من واحد', en: 'Using two fuses instead of one' }
+                    ],
+                    correct: 0,
+                    answer: { ar: 'العزل المزدوج: طبقتان من العزل تمنعان الاتصال بالأجزاء الحية، مما يلغي الحاجة لسلك الأرضي', en: 'Double insulation: two layers of insulation prevent contact with live parts, eliminating the need for an earth wire' }
+                },
+                {
+                    q: { ar: 'ما هو قاطع التيار المتبقي (RCCB)؟', en: 'What is a Residual Current Circuit Breaker (RCCB)?' },
+                    options: [
+                        { ar: 'جهاز يكتشف اختلال التيار ويفصل الدائرة بسرعة', en: 'A device that detects current imbalances and switches off quickly' },
+                        { ar: 'جهاز يقيس مقاومة الدائرة', en: 'A device that measures circuit resistance' },
+                        { ar: 'جهاز يزيد من كفاءة الطاقة', en: 'A device that increases energy efficiency' },
+                        { ar: 'جهاز يخزن الكهرباء الزائدة', en: 'A device that stores excess electricity' }
+                    ],
+                    correct: 0,
+                    answer: { ar: 'RCCB يكتشف اختلال التيار (مثل تسرب التيار إلى الأرض) ويفصل الدائرة بسرعة لحماية المستخدم', en: 'RCCB detects current imbalances (like current leaking to earth) and switches off quickly to protect the user' }
+                },
+                {
+                    q: { ar: 'لماذا يجب أن يكون الفيوز متصلاً بالسلك الحي (Live wire) وليس المحايد؟', en: 'Why must the fuse be connected to the live wire and not the neutral?' },
+                    options: [
+                        { ar: 'لفصل الجهاز عن مصدر الكهرباء الحي عند حدوث عطل', en: 'To disconnect the appliance from the live supply in case of a fault' },
+                        { ar: 'لأن السلك الحي يحمل تياراً أقل', en: 'Because the live wire carries less current' },
+                        { ar: 'لأن السلك المحايد أكثر أماناً', en: 'Because the neutral wire is safer' },
+                        { ar: 'لا فرق بين السلكين', en: 'There is no difference between the two wires' }
+                    ],
+                    correct: 0,
+                    answer: { ar: 'الفيوز على السلك الحي يضمن فصل الجهاز تماماً عن مصدر الكهرباء عند حدوث عطل', en: 'Fuse on the live wire ensures the appliance is completely disconnected from the electricity supply in case of a fault' }
+                },
+                {
+                    q: { ar: 'أي من التالي يُعد ميزة أمان في الكابلات الكهربائية؟', en: 'Which of the following is a safety feature in electrical cables?' },
+                    options: [
+                        { ar: 'الغلاف العازل (Insulated casing)', en: 'Insulated casing' },
+                        { ar: 'اللون الزاهي', en: 'Bright color' },
+                        { ar: 'السماكة الكبيرة', en: 'Large thickness' },
+                        { ar: 'الطول الطويل', en: 'Long length' }
+                    ],
+                    correct: 0,
+                    answer: { ar: 'الغلاف العازل يمنع الصدمة الكهربائية بمنع الاتصال بالأجزاء الحية', en: 'Insulated casing prevents electric shock by preventing contact with live parts' }
+                }
+            ]
+        },
+        {
+            id: 'sec5',
+            title: { ar: ' الجزء 5: Calculations & Applications (الحسابات والتطبيقات)', en: '🔹 Part 5: Calculations & Applications' },
+            questions: [
+                {
+                    q: { ar: 'سيارة تتحرك بسرعة <span class="math-display">30 m/s</span> وتتوقف في <span class="math-display">8 ثوانٍ</span>. ما التسارع؟', en: 'A car moving at <span class="math-display">30 m/s</span> stops in <span class="math-display">8 seconds</span>. What is the acceleration?' },
+                    options: [
+                        { ar: '<span class="math-display">-3.75 m/s²</span>', en: '<span class="math-display">-3.75 m/s²</span>' },
+                        { ar: '<span class="math-display">3.75 m/s²</span>', en: '<span class="math-display">3.75 m/s²</span>' },
+                        { ar: '<span class="math-display">-4.0 m/s²</span>', en: '<span class="math-display">-4.0 m/s²</span>' },
+                        { ar: '<span class="math-display">0 m/s²</span>', en: '<span class="math-display">0 m/s²</span>' }
+                    ],
+                    correct: 0,
+                    answer: { ar: 'a = (v - u)/t = (0 - 30)/8 = -3.75 m/s² (التسارع سالب لأنه تباطؤ)', en: 'a = (v - u)/t = (0 - 30)/8 = -3.75 m/s² (negative because it\'s deceleration)' }
+                },
+                {
+                    q: { ar: 'حوت كتلته <span class="math-display">4100 kg</span> تؤثر عليه قوة محصلة <span class="math-display">18000 N</span>. ما التسارع؟', en: 'A whale of mass <span class="math-display">4100 kg</span> has a resultant force of <span class="math-display">18000 N</span>. What is the acceleration?' },
+                    options: [
+                        { ar: '<span class="math-display">4.39 m/s²</span>', en: '<span class="math-display">4.39 m/s²</span>' },
+                        { ar: '<span class="math-display">0.23 m/s²</span>', en: '<span class="math-display">0.23 m/s²</span>' },
+                        { ar: '<span class="math-display">18 m/s²</span>', en: '<span class="math-display">18 m/s²</span>' },
+                        { ar: '<span class="math-display">41 m/s²</span>', en: '<span class="math-display">41 m/s²</span>' }
+                    ],
+                    correct: 0,
+                    answer: { ar: 'a = F/m = 18000/4100 = 4.39 m/s²', en: 'a = F/m = 18000/4100 = 4.39 m/s²' }
+                },
+                {
+                    q: { ar: 'ما تأثير زيادة تعب السائق على مسافة التفكير (thinking distance)؟', en: 'What is the effect of increased driver tiredness on thinking distance?' },
+                    options: [
+                        { ar: 'تزيد مسافة التفكير', en: 'Thinking distance increases' },
+                        { ar: 'تنقص مسافة التفكير', en: 'Thinking distance decreases' },
+                        { ar: 'تبقى مسافة التفكير ثابتة', en: 'Thinking distance remains constant' },
+                        { ar: 'تصبح مسافة التفكير صفراً', en: 'Thinking distance becomes zero' }
+                    ],
+                    correct: 0,
+                    answer: { ar: 'تعب السائق يزيد زمن رد الفعل، مما يزيد مسافة التفكير', en: 'Driver tiredness increases reaction time, increasing thinking distance' }
+                },
+                {
+                    q: { ar: 'مصباح LED يتلف إذا تجاوز التيار <span class="math-display">15 mA</span>. المقاوم في الدائرة <span class="math-display">270 Ω</span>. ما أقصى جهد لمصدر الكهرباء دون إتلاف الـ LED؟', en: 'An LED is damaged if current exceeds <span class="math-display">15 mA</span>. The resistor in the circuit is <span class="math-display">270 Ω</span>. What is the maximum voltage of the power supply without damaging the LED?' },
+                    options: [
+                        { ar: '<span class="math-display">4.05 V</span>', en: '<span class="math-display">4.05 V</span>' },
+                        { ar: '<span class="math-display">4050 V</span>', en: '<span class="math-display">4050 V</span>' },
+                        { ar: '<span class="math-display">0.056 V</span>', en: '<span class="math-display">0.056 V</span>' },
+                        { ar: '<span class="math-display">18 V</span>', en: '<span class="math-display">18 V</span>' }
+                    ],
+                    correct: 0,
+                    answer: { ar: 'V = I × R = 0.015 × 270 = 4.05 V', en: 'V = I × R = 0.015 × 270 = 4.05 V' }
+                }
+            ]
+        }
+    ]
+};
+
+function shuffleArray(array) {
+    const arr = [...array];
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(rng() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+}
+
+let examData;
+let correctAnswersMap = {};
+let currentLang = 'ar';
+let timeRemaining = TOTAL_TIME;
+let timerInterval;
+
+function prepareShuffledExam() {
+    rng = mulberry32(currentSeed);
+    examData = JSON.parse(JSON.stringify(originalExamData));
+    correctAnswersMap = {};
+    let globalIdx = 0;
+    
+    examData.sections.forEach((section) => {
+        section.questions = shuffleArray(section.questions);
+        section.questions.forEach((q) => {
+            const optionsWithCorrect = q.options.map((opt, idx) => ({
+                option: opt,
+                isCorrect: idx === q.correct
+            }));
+            const shuffledOptions = shuffleArray(optionsWithCorrect);
+            q.options = shuffledOptions.map(o => o.option);
+            const newCorrectIndex = shuffledOptions.findIndex(o => o.isCorrect);
+            q.correct = newCorrectIndex;
+            correctAnswersMap[globalIdx] = String.fromCharCode(97 + newCorrectIndex);
+            globalIdx++;
+        });
+    });
+    
+    actualQuestionsCount = globalIdx;
+}
+
+function reshuffleExam() {
+    const confirmMsg = currentLang === 'ar' 
+        ? '🔄 سيتم إنشاء أسئلة جديدة ومسح إجاباتك الحالية. هل أنت متأكد؟' 
+        : '🔄 New questions will be generated and your current answers will be cleared. Are you sure?';
+    if (confirm(confirmMsg)) {
+        currentSeed = Date.now();
+        timeRemaining = TOTAL_TIME;
+        answersVisible = false;
+        prepareShuffledExam();
+        renderExam();
+        saveState();
+        alert(currentLang === 'ar' ? '🎲 تم تغيير الأسئلة! حظاً موفقاً! 🍀' : '🎲 Questions changed! Good luck! 🍀');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+}
+
+function setLanguage(lang) {
+    currentLang = lang;
+    document.documentElement.lang = lang;
+    document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+    document.getElementById('btn-ar').classList.toggle('active', lang === 'ar');
+    document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+    document.body.classList.toggle('en-mode', lang === 'en');
+    
+    document.querySelectorAll('[data-ar][data-en]').forEach(el => {
+        el.innerHTML = lang === 'ar' ? el.getAttribute('data-ar') : el.getAttribute('data-en');
+    });
+    renderExam();
+    saveState(false);
+}
+
+function renderExam() {
+    const container = document.getElementById('exam-content');
+    const labels = {
+        ar: { option: ['أ', 'ب', 'ج', 'د'], answer: '✅ الإجابة:' },
+        en: { option: ['A', 'B', 'C', 'D'], answer: '✅ Answer:' }
+    };
+    const lbl = labels[currentLang];
+    const isRTL = currentLang === 'ar';
+    let html = '';
+    let globalIdx = 0;
+    
+    examData.sections.forEach((section) => {
+        html += `<section class="bg-white p-6 rounded-2xl shadow-lg border-2 border-red-100">
+            <h2 class="text-xl font-bold mb-4 text-red-700">${section.title[currentLang]}</h2>
+            <ol class="space-y-4 text-sm">`;
+            
+        section.questions.forEach((q) => {
+            const borderSide = isRTL ? 'border-r-4 pr-4' : 'border-l-4 pl-4';
+            html += `<li class="${borderSide} border-red-400 py-2" id="q-${globalIdx}">
+                <strong>${globalIdx + 1}.</strong> ${q.q[currentLang]}<br>`;
+                    
+            q.options.forEach((opt, oIdx) => {
+                const radioSide = isRTL ? 'mr-4 ml-2' : 'ml-4 mr-2';
+                html += `<label class="cursor-pointer block mt-1 ${isRTL ? 'mr-4' : 'ml-4'} hover:bg-red-50 rounded-lg p-1 transition">
+                    <input type="radio" name="q${globalIdx}" value="${String.fromCharCode(97 + oIdx)}" class="${radioSide}"> 
+                    ${lbl.option[oIdx]}) ${opt[currentLang]}
+                </label>`;
+            });
+            html += `<div class="answer-box text-green-700 mt-2 font-medium ${answersVisible ? '' : 'hidden'} bg-green-50 rounded-lg p-2">
+                ${lbl.answer} ${lbl.option[q.correct]}) ${q.options[q.correct][currentLang]} — ${q.answer[currentLang]}
+            </div></li>`;
+            globalIdx++;
+        });
+        html += `</ol></section>`;
+    });
+    container.innerHTML = html;
+}
+
+function startTimer() {
+    document.getElementById('timer-container').style.display = 'block';
+    updateTimerDisplay();
+    timerInterval = setInterval(() => {
+        timeRemaining--;
+        updateTimerDisplay();
+        if (timeRemaining % 5 === 0) saveState(false);
+        if (timeRemaining <= 300) document.getElementById('timer').classList.add('timer-warning');
+        if (timeRemaining <= 0) {
+            clearInterval(timerInterval);
+            alert(currentLang === 'ar' ? "⏰ انتهى الوقت! سأصحح إجاباتك الآن." : "⏰ Time's up! Let me grade your answers.");
+            gradeExam();
+        }
+    }, 1000);
+}
+
+function updateTimerDisplay() {
+    const minutes = Math.floor(timeRemaining / 60);
+    const seconds = timeRemaining % 60;
+    document.getElementById('timer').textContent = `${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
+}
+
+function toggleAnswers() {
+    answersVisible = !answersVisible;
+    document.querySelectorAll('.answer-box').forEach(el => {
+        el.classList.toggle('hidden', !answersVisible);
+    });
+    saveState(false);
+}
+
+// ✅ التصحيح المحسّن مع حساب دقيق للنسبة المئوية
+function gradeExam() {
+    let correctCount = 0;
+    const sectionScores = new Array(examData.sections.length).fill(0);
+    
+    actualQuestionsCount = 0;
+    examData.sections.forEach(section => {
+        actualQuestionsCount += section.questions.length;
+    });
+    
+    for (let i = 0; i < actualQuestionsCount; i++) {
+        const selected = document.querySelector(`input[name="q${i}"]:checked`);
+        const li = document.getElementById(`q-${i}`);
+        const correctAnswer = correctAnswersMap[i];
+        
+        if (li) {
+            const isCorrect = selected && selected.value === correctAnswer;
+            if (isCorrect) {
+                correctCount++;
+                li.classList.add('correct');
+                li.classList.remove('incorrect');
+                
+                let sectionIndex = 0;
+                let questionIndex = i;
+                for (let s = 0; s < examData.sections.length; s++) {
+                    if (questionIndex < examData.sections[s].questions.length) {
+                        sectionIndex = s;
+                        break;
+                    }
+                    questionIndex -= examData.sections[s].questions.length;
+                }
+                sectionScores[sectionIndex]++;
+            } else {
+                li.classList.add('incorrect');
+                li.classList.remove('correct');
+            }
+        }
+    }
+    
+    // ✅ حساب النسبة المئوية بدقة
+    const percentage = actualQuestionsCount > 0 ? Math.round((correctCount / actualQuestionsCount) * 100) : 0;
+    const score = Math.round((correctCount / actualQuestionsCount) * 100);
+    
+    document.getElementById('res-total').textContent = `${score} / 100`;
+    document.getElementById('res-name').textContent = document.getElementById('studentName').value || (currentLang === 'ar' ? 'بطل' : 'Champion');
+    document.getElementById('res-date').textContent = new Date().toLocaleDateString(currentLang === 'ar' ? 'ar-AE' : 'en-US');
+    
+    const performanceContainer = document.getElementById('sections-performance');
+    performanceContainer.innerHTML = '';
+    examData.sections.forEach((section, idx) => {
+        performanceContainer.innerHTML += `
+            <div class="flex justify-between items-center">
+                <span class="text-gray-700">${section.title[currentLang]}</span>
+                <span class="font-bold text-red-700">${sectionScores[idx]}/${section.questions.length}</span>
+            </div>`;
+    });
+    
+    const badge = document.getElementById('success-badge');
+    document.getElementById('success-percent').textContent = `${percentage}%`;
+    
+    if (currentLang === 'ar') {
+        if (percentage >= 90) { badge.textContent = ' ممتاز جداً! 🌟'; badge.className = 'success-badge grade-excellent'; }
+        else if (percentage >= 75) { badge.textContent = '👏 ممتاز! 👏'; badge.className = 'success-badge grade-good'; }
+        else if (percentage >= 50) { badge.textContent = '👍 جيد'; badge.className = 'success-badge grade-pass'; }
+        else { badge.textContent = ' حاول مرة أخرى'; badge.className = 'success-badge grade-fail'; }
+    } else {
+        if (percentage >= 90) { badge.textContent = '🌟 Outstanding! 🌟'; badge.className = 'success-badge grade-excellent'; }
+        else if (percentage >= 75) { badge.textContent = '👏 Excellent! 👏'; badge.className = 'success-badge grade-good'; }
+        else if (percentage >= 50) { badge.textContent = ' Good'; badge.className = 'success-badge grade-pass'; }
+        else { badge.textContent = '💪 Try Again'; badge.className = 'success-badge grade-fail'; }
+    }
+    document.getElementById('results-panel').classList.remove('hidden');
+    document.getElementById('results-panel').scrollIntoView({ behavior: 'smooth' });
+    if (timerInterval) clearInterval(timerInterval);
+}
+
+function sendResultsToEmail() {
+    const btn = document.getElementById('sendEmailBtn');
+    const status = document.getElementById('emailStatus');
+    btn.disabled = true;
+    btn.textContent = currentLang === 'ar' ? '⏳ جاري الإرسال...' : '📤 Sending...';
+
+    const name = document.getElementById('studentName').value || 'N/A';
+    const studentClass = document.getElementById('studentClass').value || 'N/A';
+    const date = document.getElementById('examDate').value || new Date().toLocaleDateString();
+    const score = document.getElementById('res-total').textContent;
+    const successRate = document.getElementById('success-percent').textContent;
+    const badge = document.getElementById('success-badge').textContent;
+
+    let questionsHTML = '';
+    let globalIdx = 0;
+    examData.sections.forEach((section, sectionIdx) => {
+        questionsHTML += `<tr style="background: linear-gradient(135deg, #dc2626, #b91c1c); color: white;">
+            <td colspan="5" style="padding: 12px; font-weight: bold; font-size: 14px;">
+                📌 ${currentLang === 'ar' ? 'القسم' : 'Section'} ${sectionIdx + 1}: ${section.title[currentLang]}
+            </td></tr>`;
+        section.questions.forEach((q) => {
+            const selected = document.querySelector(`input[name="q${globalIdx}"]:checked`);
+            const selectedValue = selected ? selected.value : null;
+            const correctValue = correctAnswersMap[globalIdx];
+            const isCorrect = selectedValue === correctValue;
+            
+            let studentAnswerText = currentLang === 'ar' ? '❌ لم يجب' : ' No answer';
+            let studentAnswerColor = '#dc2626';
+            if (selectedValue) {
+                const selectedIndex = selectedValue.charCodeAt(0) - 97;
+                studentAnswerText = q.options[selectedIndex][currentLang];
+                studentAnswerColor = isCorrect ? '#059669' : '#dc2626';
+            }
+            const correctAnswerText = q.options[q.correct][currentLang];
+            const rowBg = isCorrect ? '#f0fdf4' : '#fef2f2';
+            const borderLeft = isCorrect ? '4px solid #10b981' : '4px solid #ef4444';
+            
+            questionsHTML += `<tr style="background: ${rowBg}; border-right: ${borderLeft};">
+                <td style="padding: 10px; border: 1px solid #e5e7eb; text-align: center; font-weight: bold; vertical-align: top; width: 35px;">${globalIdx + 1}</td>
+                <td style="padding: 10px; border: 1px solid #e5e7eb; vertical-align: top; width: 35%;">
+                    <strong style="color: #b91c1c;">${currentLang === 'ar' ? '❓ السؤال:' : '❓ Question:'}</strong><br>
+                    <span style="color: #374151; font-size: 13px;">${q.q[currentLang]}</span>
+                </td>
+                <td style="padding: 10px; border: 1px solid #e5e7eb; vertical-align: top; width: 22%;">
+                    <strong style="color: ${studentAnswerColor};">${currentLang === 'ar' ? '✍️ إجابة الطالب:' : '✍️ Student Answer:'}</strong><br>
+                    <span style="color: ${studentAnswerColor}; font-size: 13px;">${studentAnswerText}</span>
+                </td>
+                <td style="padding: 10px; border: 1px solid #e5e7eb; vertical-align: top; width: 22%;">
+                    <strong style="color: #059669;">${currentLang === 'ar' ? '✅ الإجابة الصحيحة:' : '✅ Correct Answer:'}</strong><br>
+                    <span style="color: #059669; font-size: 13px;">${correctAnswerText}</span>
+                </td>
+                <td style="padding: 10px; border: 1px solid #e5e7eb; text-align: center; vertical-align: middle; width: 60px;">
+                    ${isCorrect 
+                        ? '<span style="font-size: 24px;">✅</span><br><span style="color: #059669; font-weight: bold; font-size: 11px;">' + (currentLang === 'ar' ? 'صحيح' : 'Correct') + '</span>' 
+                        : '<span style="font-size: 24px;">❌</span><br><span style="color: #dc2626; font-weight: bold; font-size: 11px;">' + (currentLang === 'ar' ? 'خطأ' : 'Wrong') + '</span>'}
+                </td></tr>`;
+            globalIdx++;
+        });
+    });
+
+    const answersHTML = `
+        <div style="font-family: 'Segoe UI', Tahoma, Arial, sans-serif; direction: ${currentLang === 'ar' ? 'rtl' : 'ltr'};">
+            <div style="background: linear-gradient(135deg, #dc2626, #b91c1c); color: white; padding: 20px; border-radius: 10px 10px 0 0; text-align: center;">
+                <h2 style="margin: 0; font-size: 22px;">🔬 ${currentLang === 'ar' ? 'نتيجة امتحان IGCSE Physics' : 'IGCSE Physics Exam Result'}</h2>
+                <p style="margin: 5px 0 0 0; opacity: 0.9;">${currentLang === 'ar' ? 'Pearson Edexcel International GCSE (9-1)' : 'Pearson Edexcel International GCSE (9-1)'}</p>
+            </div>
+            <div style="background: #fef2f2; padding: 15px; border: 1px solid #fecaca;">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr>
+                        <td style="padding: 8px; font-weight: bold; color: #b91c1c;">${currentLang === 'ar' ? '😊 الاسم:' : '😊 Name:'}</td>
+                        <td style="padding: 8px;">${name}</td>
+                        <td style="padding: 8px; font-weight: bold; color: #b91c1c;">${currentLang === 'ar' ? ' الشعبة:' : '🏫 Class:'}</td>
+                        <td style="padding: 8px;">${studentClass}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px; font-weight: bold; color: #b91c1c;">${currentLang === 'ar' ? '📅 التاريخ:' : '📅 Date:'}</td>
+                        <td style="padding: 8px;">${date}</td>
+                        <td style="padding: 8px; font-weight: bold; color: #b91c1c;">${currentLang === 'ar' ? '🏆 التقدير:' : ' Grade:'}</td>
+                        <td style="padding: 8px;">${badge}</td>
+                    </tr>
+                </table>
+            </div>
+            <div style="background: white; padding: 20px; text-align: center; border-bottom: 2px solid #e5e7eb;">
+                <div style="display: inline-block; margin: 0 15px;">
+                    <div style="font-size: 32px; font-weight: bold; color: #dc2626;">${score}</div>
+                    <div style="color: #6b7280; font-size: 13px;">${currentLang === 'ar' ? 'الدرجة الكلية' : 'Total Score'}</div>
+                </div>
+                <div style="display: inline-block; margin: 0 15px;">
+                    <div style="font-size: 32px; font-weight: bold; color: #059669;">${successRate}%</div>
+                    <div style="color: #6b7280; font-size: 13px;">${currentLang === 'ar' ? 'نسبة النجاح' : 'Success Rate'}</div>
+                </div>
+            </div>
+            <h3 style="background: #f3f4f6; padding: 12px; margin: 0; color: #1f2937; border-bottom: 2px solid #d1d5db;">
+                📝 ${currentLang === 'ar' ? 'تفاصيل الأسئلة والإجابات الكاملة' : 'Full Questions & Answers Details'}
+            </h3>
+            <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                <thead>
+                    <tr style="background: #dc2626; color: white;">
+                        <th style="padding: 10px; border: 1px solid #b91c1c; width: 35px;">#</th>
+                        <th style="padding: 10px; border: 1px solid #b91c1c; width: 35%;">${currentLang === 'ar' ? 'السؤال' : 'Question'}</th>
+                        <th style="padding: 10px; border: 1px solid #b91c1c; width: 22%;">${currentLang === 'ar' ? 'إجابة الطالب' : 'Student Answer'}</th>
+                        <th style="padding: 10px; border: 1px solid #b91c1c; width: 22%;">${currentLang === 'ar' ? 'الإجابة الصحيحة' : 'Correct Answer'}</th>
+                        <th style="padding: 10px; border: 1px solid #b91c1c; width: 60px;">${currentLang === 'ar' ? 'النتيجة' : 'Result'}</th>
+                    </tr>
+                </thead>
+                <tbody>${questionsHTML}</tbody>
+            </table>
+            <div style="background: linear-gradient(135deg, #fef2f2, #fee2e2); padding: 15px; border-radius: 0 0 10px 10px; border-top: 2px solid #dc2626;">
+                <p style="margin: 0; color: #b91c1c; text-align: center; font-size: 13px;">
+                    🔬 <strong>${currentLang === 'ar' ? 'أحسنت يا بطل! استمر في إتقان الفيزياء!' : 'Great job, champion! Keep mastering Physics!'}</strong> 🔬
+                </p>
+                <p style="margin: 5px 0 0 0; color: #b91c1c; text-align: center; font-size: 12px;">
+                    ${currentLang === 'ar' ? 'تم إرسال هذا التقرير تلقائياً | Mr. Mohammed Hesham' : 'This report was automatically sent | Mr. Mohammed Hesham'}
+                </p>
+            </div>
+        </div>`;
+
+    emailjs.send(SERVICE_ID, TEMPLATE_ID, {
+        to_email: TARGET_EMAIL,
+        student_name: name,
+        student_class: studentClass,
+        exam_date: date,
+        total_score: score,
+        success_rate: successRate,
+        grade: badge,
+        answers_table: answersHTML
+    }).then(() => {
+        status.textContent = currentLang === 'ar' ? '✅ تم إرسال نتيجتك للمعلم!' : '✅ Your result was sent to the teacher!';
+        status.style.color = '#059669';
+        btn.textContent = currentLang === 'ar' ? '✓ تم الإرسال' : '✓ Sent';
+    }).catch(err => {
+        status.textContent = currentLang === 'ar' ? '❌ حدث خطأ، حاول مرة أخرى' : '❌ Something went wrong, try again';
+        status.style.color = '#dc2626';
+        btn.disabled = false;
+        btn.textContent = currentLang === 'ar' ? '📧 حاول مرة أخرى' : '📧 Try Again';
+        console.error('EmailJS Error:', err);
+    });
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+    const savedState = loadState();
+    if (savedState && savedState.seed) {
+        currentSeed = savedState.seed;
+        currentLang = savedState.lang || 'ar';
+        timeRemaining = savedState.timeRemaining !== undefined ? savedState.timeRemaining : TOTAL_TIME;
+        answersVisible = savedState.answersVisible || false;
+        document.documentElement.lang = currentLang;
+        document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+        document.getElementById('btn-ar').classList.toggle('active', currentLang === 'ar');
+        document.getElementById('btn-en').classList.toggle('active', currentLang === 'en');
+        document.body.classList.toggle('en-mode', currentLang === 'en');
+        document.querySelectorAll('[data-ar][data-en]').forEach(el => {
+            el.innerHTML = currentLang === 'ar' ? el.getAttribute('data-ar') : el.getAttribute('data-en');
+        });
+    } else {
+        currentSeed = Date.now();
+    }
+    prepareShuffledExam();
+    renderExam();
+    if (savedState) {
+        if (savedState.studentName) document.getElementById('studentName').value = savedState.studentName;
+        if (savedState.studentClass) document.getElementById('studentClass').value = savedState.studentClass;
+        if (savedState.examDate) document.getElementById('examDate').value = savedState.examDate;
+        if (savedState.answers) restoreAnswers(savedState.answers);
+    }
+    setupAnswerListeners();
+    setupInputListeners();
+    startTimer();
+});
+
+window.addEventListener('beforeunload', () => saveState(false));
+</script>
+</body>
+</html>
